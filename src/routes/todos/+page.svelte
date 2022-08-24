@@ -4,6 +4,13 @@
   import { flip } from 'svelte/animate'
   import type { PageData } from './$types'
 
+  const actions = {
+    create: { path: '/todos?action.create', form: enhance },
+    toggle: { path: '/todos?action.toggle', form: enhance },
+    edit: { path: '/todos?action.edit', form: enhance },
+    delete: { path: '/todos?action.delete', form: enhance },
+  }
+
   export let data: PageData
 </script>
 
@@ -17,9 +24,9 @@
 
   <form
     class="new"
-    action="/todos"
+    action={actions.create.path}
     method="post"
-    use:enhance={{
+    use:actions.create.form={{
       result: async ({ form }) => {
         form.reset()
       },
@@ -36,9 +43,9 @@
       animate:flip={{ duration: 200 }}
     >
       <form
-        action="/todos?_method=PATCH"
+        action={actions.toggle.path}
         method="post"
-        use:enhance={{
+        use:actions.toggle.form={{
           pending: ({ data }) => {
             todo.done = !!data.get('done')
           },
@@ -49,16 +56,16 @@
         <button class="toggle" aria-label="Mark todo as {todo.done ? 'not done' : 'done'}" />
       </form>
 
-      <form class="text" action="/todos?_method=PATCH" method="post" use:enhance>
+      <form class="text" action={actions.edit.path} method="post" use:actions.edit.form>
         <input type="hidden" name="uid" value={todo.uid} />
         <input aria-label="Edit todo" type="text" name="text" value={todo.text} />
         <button class="save" aria-label="Save todo" />
       </form>
 
       <form
-        action="/todos?_method=DELETE"
+        action={actions.delete.path}
         method="post"
-        use:enhance={{
+        use:actions.delete.form={{
           pending: () => (todo.pending_delete = true),
         }}
       >

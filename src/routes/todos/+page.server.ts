@@ -31,25 +31,42 @@ export const load: PageServerLoad = async ({ locals }) => {
   throw error(response.status)
 }
 
-export const POST: Action = async ({ request, locals }) => {
-  const form = await request.formData()
+import type { RequestEvent } from '@sveltejs/kit'
+type ServerFormAction = (event: RequestEvent & { fields: FormData }) => ReturnType<Action>
 
-  await api('POST', `todos/${locals.userid}`, {
-    text: form.get('text'),
-  })
+// Quick & dirty mockup of the proposed server actions API
+const actions: Record<string, ServerFormAction> = {
+  async create({ fields, locals }) {
+    await api('POST', `todos/${locals.userid}`, {
+      text: fields.get('text'),
+    })
+  },
+
+  async toggle({ fields, locals }) {
+    await api('PATCH', `todos/${locals.userid}/${fields.get('uid')}`, {
+      done: fields.has('done') ? !!fields.get('done') : undefined,
+    })
+  },
+
+  async edit({ fields, locals }) {
+    await api('PATCH', `todos/${locals.userid}/${fields.get('uid')}`, {
+      text: fields.has('text') ? fields.get('text') : undefined,
+    })
+  },
+
+  async delete({ fields, locals }) {
+    await api('DELETE', `todos/${locals.userid}/${fields.get('uid')}`)
+  },
 }
 
-export const PATCH: Action = async ({ request, locals }) => {
-  const form = await request.formData()
+export const POST: Action = async (event) => {
+  const { request, url } = event
+  const action = Object.entries(actions).find(([name]) => url.searchParams.has(`action.${name}`))
 
-  await api('PATCH', `todos/${locals.userid}/${form.get('uid')}`, {
-    text: form.has('text') ? form.get('text') : undefined,
-    done: form.has('done') ? !!form.get('done') : undefined,
-  })
-}
+  if (action) {
+    const handler = action[1]
+    const fields = await request.formData()
 
-export const DELETE: Action = async ({ request, locals }) => {
-  const form = await request.formData()
-
-  await api('DELETE', `todos/${locals.userid}/${form.get('uid')}`)
+    await handler({ fields, ...event })
+  }
 }
