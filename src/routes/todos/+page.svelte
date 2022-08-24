@@ -1,11 +1,22 @@
 <script lang="ts">
+  import { createActions } from '$lib/actions'
+  import { setContext } from 'svelte'
+  import { writable } from 'svelte/store'
   import { scale } from 'svelte/transition'
   import { flip } from 'svelte/animate'
   import type { PageData } from './$types'
 
-  import { actions } from './+page'
-
   export let data: PageData
+
+  // Hacky workaround to let actions manipulate page data. Ideally the framework
+  // will just pass an updated `data` prop to the page whenever an action
+  // optimisticlally updates.
+  const dataStore = setContext('PAGE_DATA_STORE', writable(data))
+  $: dataStore.set(data)
+
+  // We also have to call `createActions` here so that it can read the context
+  import { actions as actionHandlers } from './+page'
+  const actions = createActions('/todos', actionHandlers)
 </script>
 
 <svelte:head>
@@ -20,16 +31,12 @@
     class="new"
     action={actions.create.path}
     method="post"
-    on:submit={actions.create.handle({
-      result: async ({ form }) => {
-        form.reset()
-      },
-    })}
+    on:submit={actions.create.handle({})}
   >
     <input name="text" aria-label="Add todo" placeholder="+ tap to add a todo" />
   </form>
 
-  {#each data.todos as todo (todo.uid)}
+  {#each $dataStore.todos as todo (todo.uid)}
     {@const toggleAction = actions.toggle.key(todo.uid)}
     {@const editAction = actions.edit.key(todo.uid)}
     {@const deleteAction = actions.delete.key(todo.uid)}
@@ -40,15 +47,7 @@
       transition:scale|local={{ start: 0.7 }}
       animate:flip={{ duration: 200 }}
     >
-      <form
-        action={toggleAction.path}
-        method="post"
-        on:submit={toggleAction.handle({
-          pending: ({ data }) => {
-            todo.done = !!data.get('done')
-          },
-        })}
-      >
+      <form action={toggleAction.path} method="post" on:submit={toggleAction.handle({})}>
         <input type="hidden" name="done" value={todo.done ? '' : 'true'} />
         <button class="toggle" aria-label="Mark todo as {todo.done ? 'not done' : 'done'}" />
       </form>
@@ -58,13 +57,7 @@
         <button class="save" aria-label="Save todo" />
       </form>
 
-      <form
-        action={deleteAction.path}
-        method="post"
-        on:submit={deleteAction.handle({
-          pending: () => (todo.pending_delete = true),
-        })}
-      >
+      <form action={deleteAction.path} method="post" on:submit={deleteAction.handle({})}>
         <button class="delete" aria-label="Delete todo" disabled={todo.pending_delete} />
       </form>
     </div>

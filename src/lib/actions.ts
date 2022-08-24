@@ -1,13 +1,24 @@
 import { invalidate } from '$app/navigation'
+import { getContext } from 'svelte'
 
-export type PageActionHandlers = Record<string, PageActionHandler>
-export type PageActionHandler = () => void
+import type { Writable } from 'svelte/store'
+
+export type PageActionHandlers<PageData> = Record<string, PageActionHandler<PageData>>
+export type PageActionHandler<PageData> = (
+  event: PageActionEvent<PageData>,
+) => ReturnType<typeof fetch>
+export type PageActionEvent<PageData> = {
+  key: string | null
+  data: Writable<PageData>
+  form: HTMLFormElement
+  fields: FormData
+  post: (data: FormData) => ReturnType<typeof fetch>
+}
 
 export type PageActions = Record<string, PageAction>
 export type PageAction = {
   path: string
   handle(p: {
-    pending?: ({ data, form }: { data: FormData; form: HTMLFormElement }) => void
     error?: ({
       data,
       form,
@@ -19,69 +30,64 @@ export type PageAction = {
       response: Response | null
       error: Error | null
     }) => void
-    result?: ({
-      data,
-      form,
-      response,
-    }: {
-      data: FormData
-      response: Response
-      form: HTMLFormElement
-    }) => void
   }): (this: HTMLFormElement, event: SubmitEvent) => void
   key(key: string): PageAction
 }
 
-export function createActions(basePath: string, handlers: PageActionHandlers): PageActions {
+export function createActions<PageData>(
+  basePath: string,
+  handlers: PageActionHandlers<PageData>,
+): PageActions {
   return Object.fromEntries(
     Object.entries(handlers).map(([name, handler]) => [
       name,
-      createAction(`${basePath}?action.${name}`, handler),
+      createAction(basePath, name, null, handler),
     ]),
   )
 }
 
-export function createAction(path: string, handler: PageActionHandler): PageAction {
-  let current_token: unknown
+export function createAction<PageData>(
+  basePath: string,
+  name: string,
+  key: string | null,
+  handler: PageActionHandler<PageData>,
+): PageAction {
+  const data = getContext<Writable<PageData>>('PAGE_DATA_STORE')
+
+  const path = key ? `${basePath}?action.${name}=${key}` : `${basePath}?action.${name}`
 
   return {
     path,
 
-    handle({ pending, error, result }) {
+    handle({ error }) {
       return async function (event) {
-        const token = (current_token = {})
-
         event.preventDefault()
 
-        const data = new FormData(this)
+        const fields = new FormData(this)
 
-        if (pending) pending({ data, form: this })
+        function post(body: FormData) {
+          return fetch(path, {
+            method: 'POST',
+            headers: { accept: 'application/json' },
+            body,
+          })
+        }
 
         try {
-          const response = await fetch(this.action, {
-            method: this.method,
-            headers: {
-              accept: 'application/json',
-            },
-            body: data,
-          })
-
-          if (token !== current_token) return
+          const response = await handler({ key, data, post, fields, form: this })
 
           if (response.ok) {
-            if (result) result({ data, form: this, response })
-
             const url = new URL(this.action)
             url.search = url.hash = ''
             invalidate(url.href)
           } else if (error) {
-            error({ data, form: this, error: null, response })
+            error({ data: fields, form: this, error: null, response })
           } else {
             console.error(await response.text())
           }
         } catch (err: unknown) {
           if (error && err instanceof Error) {
-            error({ data, form: this, error: err, response: null })
+            error({ data: fields, form: this, error: err, response: null })
           } else {
             throw err
           }
@@ -90,7 +96,7 @@ export function createAction(path: string, handler: PageActionHandler): PageActi
     },
 
     key(key: string) {
-      return createAction(`${path}=${key}`, handler)
+      return createAction(basePath, name, key, handler)
     },
   }
 }
