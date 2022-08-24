@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit'
 import { api } from './api'
 import type { PageServerLoad, Action } from './$types'
 
-type Todo = {
+export type Todo = {
   uid: string
   created_at: Date
   text: string
@@ -39,9 +39,14 @@ type ServerFormAction = (
 // Quick & dirty mockup of the proposed server actions API
 const actions: Record<string, ServerFormAction> = {
   async create({ fields, locals }) {
-    await api('POST', `todos/${locals.userid}`, {
+    const res = await api('POST', `todos/${locals.userid}`, {
       text: fields.get('text'),
     })
+
+    if (res.ok) {
+      // Returning an "error" since the current API doesn't allow returning results
+      return { errors: { result: await res.json() }, status: 200 }
+    }
   },
 
   async toggle({ key, fields, locals }) {
@@ -70,6 +75,6 @@ export const POST: Action = async (event) => {
     const key = url.searchParams.get(`action.${name}`)
     const fields = await request.formData()
 
-    await handler({ key, fields, ...event })
+    return handler({ key, fields, ...event })
   }
 }

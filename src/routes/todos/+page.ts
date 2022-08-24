@@ -1,36 +1,40 @@
 import type { PageActionHandlers } from '$lib/actions'
 import type { PageData } from './$types'
+import type { Todo } from './+page.server'
 
 export const actions: PageActionHandlers<PageData> = {
-  async create({ post, fields, form }) {
-    const res = await post(fields)
+  async create({ data, submit, fields, form }) {
+    const { result } = await submit(fields)
 
-    form.reset()
+    if (result) {
+      data.update(($data) => {
+        $data.todos.push(result as Todo)
+        return $data
+      })
 
-    return res
+      form.reset()
+    }
   },
 
-  async toggle({ key, data, post, fields }) {
+  toggle({ key, data, submit, fields }) {
     data.update(($data) => {
       const todo = $data.todos.find((todo) => todo.uid === key)
       if (todo) todo.done = !!fields.get('done')
       return $data
     })
 
-    return post(fields)
+    submit(fields)
   },
 
-  async edit({ post, fields }) {
-    return post(fields)
-  },
+  edit: ({ submit, fields }) => submit(fields),
 
-  async delete({ key, data, post, fields }) {
+  async delete({ key, data, submit, fields }) {
     data.update(($data) => {
       const todo = $data.todos.find((todo) => todo.uid === key)
       if (todo) todo.pending_delete = true
       return $data
     })
 
-    return post(fields)
+    await submit(fields)
   },
 }

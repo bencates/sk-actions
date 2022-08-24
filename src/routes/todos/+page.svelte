@@ -27,12 +27,7 @@
 <div class="todos">
   <h1>Todos</h1>
 
-  <form
-    class="new"
-    action={actions.create.path}
-    method="post"
-    on:submit={actions.create.handle({})}
-  >
+  <form class="new" action={actions.create.path} method="post" on:submit={actions.create.handle}>
     <input name="text" aria-label="Add todo" placeholder="+ tap to add a todo" />
   </form>
 
@@ -47,17 +42,17 @@
       transition:scale|local={{ start: 0.7 }}
       animate:flip={{ duration: 200 }}
     >
-      <form action={toggleAction.path} method="post" on:submit={toggleAction.handle({})}>
+      <form action={toggleAction.path} method="post" on:submit={toggleAction.handle}>
         <input type="hidden" name="done" value={todo.done ? '' : 'true'} />
         <button class="toggle" aria-label="Mark todo as {todo.done ? 'not done' : 'done'}" />
       </form>
 
-      <form class="text" action={editAction.path} method="post" on:submit={editAction.handle({})}>
+      <form class="text" action={editAction.path} method="post" on:submit={editAction.handle}>
         <input aria-label="Edit todo" type="text" name="text" value={todo.text} />
         <button class="save" aria-label="Save todo" />
       </form>
 
-      <form action={deleteAction.path} method="post" on:submit={deleteAction.handle({})}>
+      <form action={deleteAction.path} method="post" on:submit={deleteAction.handle}>
         <button class="delete" aria-label="Delete todo" disabled={todo.pending_delete} />
       </form>
     </div>

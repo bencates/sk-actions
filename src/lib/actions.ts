@@ -1,36 +1,43 @@
-import { invalidate } from '$app/navigation'
 import { getContext } from 'svelte'
-
 import type { Writable } from 'svelte/store'
 
 export type PageActionHandlers<PageData> = Record<string, PageActionHandler<PageData>>
-export type PageActionHandler<PageData> = (
-  event: PageActionEvent<PageData>,
-) => ReturnType<typeof fetch>
+export type PageActionHandler<PageData> = (event: PageActionEvent<PageData>) => void
 export type PageActionEvent<PageData> = {
+  // The key for this action, if it has been set.
   key: string | null
+  // The page data is provided to the event as a writable store. Changing the
+  // value of this store will synchronously pass an updated `data` prop to the
+  // page.
   data: Writable<PageData>
+  // The form that is being submitted.
   form: HTMLFormElement
+  // A snapshot of the formData.
   fields: FormData
-  post: (data: FormData) => ReturnType<typeof fetch>
+  // Utility function to call the server action and unwrap it's data. If no
+  // matching server action is defined it should immediately resolve with a
+  // sensible default value, probably `{ result: {} }`.
+  //
+  // Ideally `result` and `errors` can be automatically typed in `./$types`.
+  submit: (data: FormData) => Promise<{
+    result?: Record<string, any>
+    errors?: Record<string, any>
+    location?: string
+  }>
+
+  // This should probably also include `fetch`, `params`, `url`, and `routeId` from LoadEvent
 }
 
 export type PageActions = Record<string, PageAction>
 export type PageAction = {
+  // The full path of this action, including the query param
   path: string
-  handle(p: {
-    error?: ({
-      data,
-      form,
-      response,
-      error,
-    }: {
-      data: FormData
-      form: HTMLFormElement
-      response: Response | null
-      error: Error | null
-    }) => void
-  }): (this: HTMLFormElement, event: SubmitEvent) => void
+  // A submit handler callback usable with `on:submit` or
+  handle(this: HTMLFormElement, event: SubmitEvent): void
+  // Derive a new keyed action, allowing the same handler to be used multiple
+  // times on a single page.
+  //
+  // This method could use a better name.
   key(key: string): PageAction
 }
 
@@ -59,40 +66,23 @@ export function createAction<PageData>(
   return {
     path,
 
-    handle({ error }) {
-      return async function (event) {
-        event.preventDefault()
+    async handle(event) {
+      event.preventDefault()
 
-        const fields = new FormData(this)
+      const fields = new FormData(this)
 
-        function post(body: FormData) {
-          return fetch(path, {
-            method: 'POST',
-            headers: { accept: 'application/json' },
-            body,
-          })
-        }
+      async function submit(body: FormData) {
+        const res = await fetch(path, {
+          method: 'POST',
+          headers: { accept: 'application/json' },
+          body,
+        })
 
-        try {
-          const response = await handler({ key, data, post, fields, form: this })
-
-          if (response.ok) {
-            const url = new URL(this.action)
-            url.search = url.hash = ''
-            invalidate(url.href)
-          } else if (error) {
-            error({ data: fields, form: this, error: null, response })
-          } else {
-            console.error(await response.text())
-          }
-        } catch (err: unknown) {
-          if (error && err instanceof Error) {
-            error({ data: fields, form: this, error: err, response: null })
-          } else {
-            throw err
-          }
-        }
+        // Abusing the existing server API to mock the new one
+        return (await res.json()).errors
       }
+
+      await handler({ key, data, submit, fields, form: this })
     },
 
     key(key: string) {
