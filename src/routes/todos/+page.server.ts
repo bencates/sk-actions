@@ -32,7 +32,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 }
 
 import type { RequestEvent } from '@sveltejs/kit'
-type ServerFormAction = (event: RequestEvent & { fields: FormData }) => ReturnType<Action>
+type ServerFormAction = (
+  event: RequestEvent & { key: string | null; fields: FormData },
+) => ReturnType<Action>
 
 // Quick & dirty mockup of the proposed server actions API
 const actions: Record<string, ServerFormAction> = {
@@ -42,20 +44,20 @@ const actions: Record<string, ServerFormAction> = {
     })
   },
 
-  async toggle({ fields, locals }) {
-    await api('PATCH', `todos/${locals.userid}/${fields.get('uid')}`, {
+  async toggle({ key, fields, locals }) {
+    await api('PATCH', `todos/${locals.userid}/${key}`, {
       done: fields.has('done') ? !!fields.get('done') : undefined,
     })
   },
 
-  async edit({ fields, locals }) {
-    await api('PATCH', `todos/${locals.userid}/${fields.get('uid')}`, {
+  async edit({ key, fields, locals }) {
+    await api('PATCH', `todos/${locals.userid}/${key}`, {
       text: fields.has('text') ? fields.get('text') : undefined,
     })
   },
 
-  async delete({ fields, locals }) {
-    await api('DELETE', `todos/${locals.userid}/${fields.get('uid')}`)
+  async delete({ key, locals }) {
+    await api('DELETE', `todos/${locals.userid}/${key}`)
   },
 }
 
@@ -64,9 +66,10 @@ export const POST: Action = async (event) => {
   const action = Object.entries(actions).find(([name]) => url.searchParams.has(`action.${name}`))
 
   if (action) {
-    const handler = action[1]
+    const [name, handler] = action
+    const key = url.searchParams.get(`action.${name}`)
     const fields = await request.formData()
 
-    await handler({ fields, ...event })
+    await handler({ key, fields, ...event })
   }
 }
