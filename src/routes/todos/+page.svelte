@@ -20,11 +20,11 @@
     class="new"
     action={actions.create.path}
     method="post"
-    use:actions.create.form={{
+    on:submit={actions.create.handle({
       result: async ({ form }) => {
         form.reset()
       },
-    }}
+    })}
   >
     <input name="text" aria-label="Add todo" placeholder="+ tap to add a todo" />
   </form>
@@ -43,17 +43,17 @@
       <form
         action={toggleAction.path}
         method="post"
-        use:toggleAction.form={{
+        on:submit={toggleAction.handle({
           pending: ({ data }) => {
             todo.done = !!data.get('done')
           },
-        }}
+        })}
       >
         <input type="hidden" name="done" value={todo.done ? '' : 'true'} />
         <button class="toggle" aria-label="Mark todo as {todo.done ? 'not done' : 'done'}" />
       </form>
 
-      <form class="text" action={editAction.path} method="post" use:editAction.form>
+      <form class="text" action={editAction.path} method="post" on:submit={editAction.handle({})}>
         <input aria-label="Edit todo" type="text" name="text" value={todo.text} />
         <button class="save" aria-label="Save todo" />
       </form>
@@ -61,9 +61,9 @@
       <form
         action={deleteAction.path}
         method="post"
-        use:deleteAction.form={{
+        on:submit={deleteAction.handle({
           pending: () => (todo.pending_delete = true),
-        }}
+        })}
       >
         <button class="delete" aria-label="Delete todo" disabled={todo.pending_delete} />
       </form>
