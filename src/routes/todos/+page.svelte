@@ -6,15 +6,18 @@
   import { flip } from 'svelte/animate'
   import type { PageData } from './$types'
 
-  export let data: PageData
-
   // Hacky workaround to let actions manipulate page data. Ideally the framework
   // will just pass an updated `data` prop to the page whenever an action
   // optimisticlally updates.
-  const dataStore = setContext('PAGE_DATA_STORE', writable(data))
-  $: dataStore.set(data)
+  let pageData: PageData
+  export { pageData as data }
+  const data = setContext('PAGE_DATA_STORE', writable(pageData))
+  $: data.set(pageData)
 
-  // We also have to call `createActions` here so that it can read the context
+  // We also have to call `createActions` here so that it can read the page data
+  // context. `actions` is also a store here to allow the page to notice updates
+  // to errors. Like with `data`, the framework should instead be able to pass
+  // an updated `actions` prop to the page as necessary.
   import { actions as actionHandlers } from './+page'
   const actions = createActions('/todos', actionHandlers)
 </script>
@@ -27,14 +30,23 @@
 <div class="todos">
   <h1>Todos</h1>
 
-  <form class="new" action={actions.create.path} method="post" on:submit={actions.create.handle}>
+  <form class="new" action={$actions.create.path} method="post" on:submit={$actions.create.handle}>
     <input name="text" aria-label="Add todo" placeholder="+ tap to add a todo" />
   </form>
 
-  {#each $dataStore.todos as todo (todo.uid)}
-    {@const toggleAction = actions.toggle.key(todo.uid)}
-    {@const editAction = actions.edit.key(todo.uid)}
-    {@const deleteAction = actions.delete.key(todo.uid)}
+  {#if $actions.create.errors}
+    <dl class="errors">
+      {#each Object.entries($actions.create.errors) as [field, error]}
+        <dt>{field}</dt>
+        <dd>{error}</dd>
+      {/each}
+    </dl>
+  {/if}
+
+  {#each $data.todos as todo (todo.uid)}
+    {@const toggleAction = $actions.toggle.key(todo.uid)}
+    {@const editAction = $actions.edit.key(todo.uid)}
+    {@const deleteAction = $actions.delete.key(todo.uid)}
 
     <div
       class="todo"

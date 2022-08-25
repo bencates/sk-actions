@@ -4,6 +4,12 @@ import type { Todo } from './+page.server'
 
 export const actions: PageActionHandlers<PageData> = {
   async create({ data, submit, fields, form }) {
+    if ((fields.get('text') as string).length > 10) {
+      return {
+        errors: { text: 'too long' },
+      }
+    }
+
     const { result } = await submit(fields)
 
     if (result) {

@@ -32,9 +32,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 }
 
 import type { RequestEvent } from '@sveltejs/kit'
+import type { MaybePromise } from '@sveltejs/kit/types/private'
 type ServerFormAction = (
   event: RequestEvent & { key: string | null; fields: FormData },
-) => ReturnType<Action>
+) => MaybePromise<{
+  result?: Record<string, any>
+  errors?: Record<string, any>
+  location?: string
+} | void>
 
 // Quick & dirty mockup of the proposed server actions API
 const actions: Record<string, ServerFormAction> = {
@@ -44,8 +49,7 @@ const actions: Record<string, ServerFormAction> = {
     })
 
     if (res.ok) {
-      // Returning an "error" since the current API doesn't allow returning results
-      return { errors: { result: await res.json() }, status: 200 }
+      return { result: await res.json() }
     }
   },
 
@@ -75,6 +79,9 @@ export const POST: Action = async (event) => {
     const key = url.searchParams.get(`action.${name}`)
     const fields = await request.formData()
 
-    return handler({ key, fields, ...event })
+    const response = await handler({ key, fields, ...event })
+
+    // Returning an "error" since the current API doesn't allow returning results
+    return { errors: response ?? { result: {} }, status: 200 }
   }
 }
